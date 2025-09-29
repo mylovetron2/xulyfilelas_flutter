@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import 'chart_screen.dart';
+
+// Conditional imports for web support
+import 'dart:html' as html;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +21,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String? selectedLasFile;
   String? selectedTxtFile;
+  Uint8List? selectedLasFileBytes;
+  Uint8List? selectedTxtFileBytes;
+  String? selectedLasFileName;
+  String? selectedTxtFileName;
   bool isProcessing = false;
 
   // Data cho xử lý file
@@ -199,9 +209,15 @@ class _HomeScreenState extends State<HomeScreen> {
       allowedExtensions: ['las'],
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result != null) {
       setState(() {
-        selectedLasFile = result.files.single.path!;
+        if (kIsWeb) {
+          selectedLasFileBytes = result.files.single.bytes;
+          selectedLasFileName = result.files.single.name;
+          selectedLasFile = result.files.single.name;
+        } else {
+          selectedLasFile = result.files.single.path!;
+        }
       });
     }
   }
@@ -212,10 +228,33 @@ class _HomeScreenState extends State<HomeScreen> {
       allowedExtensions: ['txt'],
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result != null) {
       setState(() {
-        selectedTxtFile = result.files.single.path!;
+        if (kIsWeb) {
+          selectedTxtFileBytes = result.files.single.bytes;
+          selectedTxtFileName = result.files.single.name;
+          selectedTxtFile = result.files.single.name;
+        } else {
+          selectedTxtFile = result.files.single.path!;
+        }
       });
+    }
+  }
+
+  // Helper method để download file trên web platform
+  void _downloadFileOnWeb(String content, String fileName) {
+    if (kIsWeb) {
+      final bytes = utf8.encode(content);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = fileName;
+      html.document.body?.children.add(anchor);
+      anchor.click();
+      html.document.body?.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
     }
   }
 
@@ -228,9 +267,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       // Đọc file TXT
-      Map<String, dynamic> txtResult = await FileService.readTXT(
-        selectedTxtFile!,
-      );
+      Map<String, dynamic> txtResult;
+
+      if (kIsWeb) {
+        txtResult = await FileService.readTXTFromBytes(
+          selectedTxtFileBytes!,
+          selectedTxtFileName!,
+        );
+      } else {
+        txtResult = await FileService.readTXT(selectedTxtFile!);
+      }
 
       if (!txtResult['success']) {
         _showErrorDialog(txtResult['message']);
@@ -254,10 +300,17 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Merge TXT với LAS
-      Map<String, dynamic> mergeResult = await FileService.mergeTxtLas(
-        selectedLasFile!,
-        dataRows,
-      );
+      Map<String, dynamic> mergeResult;
+
+      if (kIsWeb) {
+        mergeResult = await FileService.mergeTxtLasFromBytes(
+          selectedLasFileBytes!,
+          selectedLasFileName!,
+          dataRows,
+        );
+      } else {
+        mergeResult = await FileService.mergeTxtLas(selectedLasFile!, dataRows);
+      }
 
       if (!mergeResult['success']) {
         _showErrorDialog(mergeResult['message']);
@@ -295,33 +348,54 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Last processed block depth: ${blockList.last.depth}');
       }
 
-      // Chọn nơi lưu file
-      String? outputPath = await FilePicker.platform.saveFile(
-        dialogTitle: 'Lưu file LAS mới',
-        fileName: 'processed.las',
-        type: FileType.custom,
-        allowedExtensions: ['las'],
-      );
-
-      if (outputPath != null) {
+      // Lưu file (khác nhau giữa web và desktop)
+      if (kIsWeb) {
         // Phân tích xu hướng để xác định isDepthIncreasing
         List<double> depthList = blockList.map((b) => b.depth).toList();
         Map<String, dynamic> trendAnalysis =
             DataProcessingService.analyzeDepthTrend(depthList);
         bool isDepthIncreasing = trendAnalysis['isIncreasing'];
 
-        bool success = await FileService.writeBlockListToLas(
-          outputPath,
+        // Tạo nội dung LAS file
+        String lasContent = await FileService.generateLasContent(
           blockList,
           wellInfoList,
           curveInfoList,
           isDepthIncreasing,
         );
 
-        if (success) {
-          _showSuccessDialog('Đã lưu file LAS mới thành công!', outputPath);
-        } else {
-          _showErrorDialog('Không ghi được file LAS mới!');
+        // Download file trên web
+        _downloadFileOnWeb(lasContent, 'processed.las');
+        _showSuccessDialog('Đã lưu file LAS mới thành công!', 'processed.las');
+      } else {
+        // Chọn nơi lưu file cho desktop
+        String? outputPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Lưu file LAS mới',
+          fileName: 'processed.las',
+          type: FileType.custom,
+          allowedExtensions: ['las'],
+        );
+
+        if (outputPath != null) {
+          // Phân tích xu hướng để xác định isDepthIncreasing
+          List<double> depthList = blockList.map((b) => b.depth).toList();
+          Map<String, dynamic> trendAnalysis =
+              DataProcessingService.analyzeDepthTrend(depthList);
+          bool isDepthIncreasing = trendAnalysis['isIncreasing'];
+
+          bool success = await FileService.writeBlockListToLas(
+            outputPath,
+            blockList,
+            wellInfoList,
+            curveInfoList,
+            isDepthIncreasing,
+          );
+
+          if (success) {
+            _showSuccessDialog('Đã lưu file LAS mới thành công!', outputPath);
+          } else {
+            _showErrorDialog('Không ghi được file LAS mới!');
+          }
         }
       }
     } catch (e) {
@@ -361,25 +435,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Chọn nơi lưu file LAS
-    String? outputPath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Lưu file LAS',
-      fileName: 'converted.las',
-      type: FileType.custom,
-      allowedExtensions: ['las'],
-    );
-
-    if (outputPath != null) {
+    // Lưu file (khác nhau giữa web và desktop)
+    if (kIsWeb) {
       setState(() {
         isProcessing = true;
       });
 
       try {
-        bool success = await LisService.convertLisToLas(lisPath, outputPath);
-        if (success) {
+        String lasContent = await LisService.convertLisToLasContent(lisPath);
+        if (lasContent.isNotEmpty) {
+          _downloadFileOnWeb(lasContent, 'converted.las');
           _showSuccessDialog(
             'Đã chuyển file LIS thành LAS thành công!',
-            outputPath,
+            'converted.las',
           );
         } else {
           _showErrorDialog('Không thể chuyển đổi file LIS!');
@@ -390,6 +458,38 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           isProcessing = false;
         });
+      }
+    } else {
+      // Chọn nơi lưu file LAS cho desktop
+      String? outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Lưu file LAS',
+        fileName: 'converted.las',
+        type: FileType.custom,
+        allowedExtensions: ['las'],
+      );
+
+      if (outputPath != null) {
+        setState(() {
+          isProcessing = true;
+        });
+
+        try {
+          bool success = await LisService.convertLisToLas(lisPath, outputPath);
+          if (success) {
+            _showSuccessDialog(
+              'Đã chuyển file LIS thành LAS thành công!',
+              outputPath,
+            );
+          } else {
+            _showErrorDialog('Không thể chuyển đổi file LIS!');
+          }
+        } catch (e) {
+          _showErrorDialog('Lỗi khi chuyển đổi: $e');
+        } finally {
+          setState(() {
+            isProcessing = false;
+          });
+        }
       }
     }
   }

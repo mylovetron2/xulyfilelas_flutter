@@ -9,6 +9,25 @@ class LisService {
 
   static Future<bool> convertLisToLas(String lisPath, String lasPath) async {
     try {
+      String lasContent = await convertLisToLasContent(lisPath);
+      if (lasContent.isEmpty) {
+        return false;
+      }
+
+      // Write to output file
+      File lasFile = File(lasPath);
+      await lasFile.writeAsString(lasContent, encoding: utf8);
+
+      return true;
+    } catch (e) {
+      print('Lỗi khi chuyển đổi LIS to LAS: $e');
+      return false;
+    }
+  }
+
+  // Generate LAS content from LIS file (for web platform)
+  static Future<String> convertLisToLasContent(String lisPath) async {
+    try {
       // Placeholder implementation
       File lisFile = File(lisPath);
       if (!await lisFile.exists()) {
@@ -69,14 +88,10 @@ class LisService {
         lasContent.writeln('${depth.toStringAsFixed(3)}    0.000');
       }
 
-      // Write to output file
-      File lasFile = File(lasPath);
-      await lasFile.writeAsString(lasContent.toString(), encoding: utf8);
-
-      return true;
+      return lasContent.toString();
     } catch (e) {
       print('Lỗi khi chuyển đổi LIS to LAS: $e');
-      return false;
+      return '';
     }
   }
 
