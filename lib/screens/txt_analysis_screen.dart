@@ -694,8 +694,10 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
         maxY: chartData.isNotEmpty
             ? chartData.map((spot) => spot.y).reduce((a, b) => a < b ? a : b)
             : 0,
+        // Tắt hoàn toàn mọi interaction và tooltip
         lineTouchData: LineTouchData(
-          enabled: false, // Tắt hoàn toàn touch interaction và tooltip
+          enabled: false,
+          touchTooltipData: LineTouchTooltipData(getTooltipItems: (_) => []),
         ),
       ),
     );
