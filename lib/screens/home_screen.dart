@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import 'chart_screen.dart';
+import 'txt_analysis_screen.dart';
 
 // Conditional imports for web support
 import 'dart:html' as html;
@@ -178,6 +179,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: const Text('Tách File TXT (UP/DOWN)'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Phân tích TXT chuyên dụng button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TxtAnalysisScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.analytics),
+                      label: const Text('Phân Tích TXT Chuyên Dụng'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
                         foregroundColor: Colors.white,
                       ),
                     ),

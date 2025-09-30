@@ -270,6 +270,13 @@ class _ChartScreenState extends State<ChartScreen> {
             belowBarData: BarAreaData(show: false),
           ),
         ],
+        // Đảo trục Y để TIME/DEPTH thấp ở phía trên, cao ở phía dưới
+        minY: chartData.isNotEmpty
+            ? chartData.map((spot) => spot.y).reduce((a, b) => a > b ? a : b)
+            : 10,
+        maxY: chartData.isNotEmpty
+            ? chartData.map((spot) => spot.y).reduce((a, b) => a < b ? a : b)
+            : 0,
         lineTouchData: LineTouchData(
           enabled: true,
           touchTooltipData: LineTouchTooltipData(
