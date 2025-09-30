@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/services.dart';
 import 'txt_analysis_screen.dart';
 import 'merge_screen.dart';
+import 'las_reader_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,6 +51,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Đọc File LAS button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LasReaderScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.file_open, size: 28),
+                      label: const Text(
+                        'Đọc File LAS',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                       ),
                     ),
