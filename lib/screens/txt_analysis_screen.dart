@@ -230,11 +230,28 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
     }
   }
 
+  Widget _buildColorLegend(String label, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Phân tích file TXT'),
+        title: const Text('Phân tích file TXT, DXT'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
@@ -269,7 +286,7 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // File selection section
+            // File selection section - toàn bộ chiều rộng
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -299,150 +316,260 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Trend analysis section
-            if (currentTrend.isNotEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        currentTrend == 'TĂNG'
-                            ? Icons.trending_up
-                            : currentTrend == 'GIẢM'
-                            ? Icons.trending_down
-                            : Icons.trending_flat,
-                        color: _getTrendColor(currentTrend),
-                        size: 32,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Xu hướng độ sâu: $currentTrend',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: _getTrendColor(currentTrend),
-                              ),
-                            ),
-                            Text(
-                              'Hệ số góc: ${currentSlope.toStringAsFixed(4)}',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // Split file section
-            if (showSplitOptions && splitResult != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Tách file theo cột DIR:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(splitResult!['message']),
-                      const SizedBox(height: 12),
-                      if (kIsWeb)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _downloadSplitFile(
-                                  splitResult!['upContent'],
-                                  splitResult!['upFileName'],
-                                ),
-                                icon: const Icon(Icons.file_download),
-                                label: Text(
-                                  'Tải ${splitResult!['upFileName']}',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _downloadSplitFile(
-                                  splitResult!['downContent'],
-                                  splitResult!['downFileName'],
-                                ),
-                                icon: const Icon(Icons.file_download),
-                                label: Text(
-                                  'Tải ${splitResult!['downFileName']}',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 16),
+            // Layout chính: Chart bên trái, thông tin bên phải
             Expanded(
-              child: selectedTxtFile == null
-                  ? const Center(
-                      child: Text(
-                        'Vui lòng chọn file TXT để hiển thị biểu đồ',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Đồ thị bên trái (70% chiều rộng)
+                  Expanded(
+                    flex: 7,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Biểu đồ phân tích TXT',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[800],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: selectedTxtFile == null
+                                  ? const Center(
+                                      child: Text(
+                                        'Vui lòng chọn file TXT để hiển thị biểu đồ',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    )
+                                  : isLoading
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : errorMessage.isNotEmpty
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.error,
+                                            size: 48,
+                                            color: Colors.red,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Lỗi: $errorMessage',
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : _buildChart(),
+                            ),
+                            if (!isLoading &&
+                                errorMessage.isEmpty &&
+                                selectedTxtFile != null)
+                              Container(
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                                child: Text(
+                                  'Điểm dữ liệu: ${chartData.length} | '
+                                  'Chế độ: ${isZoomMode ? "Zoom" : "Pan"} | '
+                                  'Xu hướng: $currentTrend',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    )
-                  : isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : errorMessage.isNotEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error, size: 48, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Lỗi: $errorMessage',
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  // Thông tin bên phải (30% chiều rộng)
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Trend analysis section
+                        if (currentTrend.isNotEmpty)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        currentTrend == 'TĂNG'
+                                            ? Icons.trending_up
+                                            : currentTrend == 'GIẢM'
+                                            ? Icons.trending_down
+                                            : Icons.trending_flat,
+                                        color: _getTrendColor(currentTrend),
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Xu hướng',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue[800],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Độ sâu: $currentTrend',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getTrendColor(currentTrend),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Hệ số góc: ${currentSlope.toStringAsFixed(4)}',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                    )
-                  : _buildChart(),
-            ),
-            if (!isLoading && errorMessage.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                child: Text(
-                  'Điểm dữ liệu: ${chartData.length} | '
-                  'Chế độ: ${isZoomMode ? "Zoom" : "Pan"} | '
-                  'Xu hướng: $currentTrend',
-                  style: const TextStyle(fontSize: 12),
-                ),
+
+                        const SizedBox(height: 16),
+
+                        // Split file section
+                        if (showSplitOptions && splitResult != null)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tách file theo DIR',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[800],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    splitResult!['message'],
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (kIsWeb) ...[
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _downloadSplitFile(
+                                          splitResult!['upContent'],
+                                          splitResult!['upFileName'],
+                                        ),
+                                        icon: const Icon(
+                                          Icons.file_download,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'UP File',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _downloadSplitFile(
+                                          splitResult!['downContent'],
+                                          splitResult!['downFileName'],
+                                        ),
+                                        icon: const Icon(
+                                          Icons.file_download,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'DOWN File',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 16),
+
+                        // Chú thích màu sắc
+                        if (currentTrend.isNotEmpty)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Chú thích màu',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[800],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildColorLegend('Tăng', Colors.green),
+                                  _buildColorLegend('Giảm', Colors.red),
+                                  _buildColorLegend('Ổn định', Colors.orange),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
           ],
         ),
       ),
