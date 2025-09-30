@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/services.dart';
 import '../models/models.dart';
-import 'chart_screen.dart';
 import 'txt_analysis_screen.dart';
 
 // Conditional imports for web support
@@ -143,42 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Vẽ biểu đồ button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: selectedTxtFile != null ? _drawChart : null,
-                      icon: const Icon(Icons.show_chart),
-                      label: const Text('Vẽ Biểu Đồ TXT'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Tách file TXT button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: selectedTxtFile != null && !isProcessing
-                          ? _splitTxtFile
-                          : null,
-                      icon: const Icon(Icons.call_split),
-                      label: const Text('Tách File TXT (UP/DOWN)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -450,17 +412,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _drawChart() async {
-    if (selectedTxtFile == null) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChartScreen(txtFilePath: selectedTxtFile!),
-      ),
-    );
-  }
-
   Future<void> _exportLisToLas() async {
     // Chọn file LIS
     FilePickerResult? lisResult = await FilePicker.platform.pickFiles(
@@ -534,74 +485,6 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         }
       }
-    }
-  }
-
-  Future<void> _splitTxtFile() async {
-    if (selectedTxtFile == null) return;
-
-    setState(() {
-      isProcessing = true;
-    });
-
-    try {
-      Map<String, dynamic> result;
-
-      if (kIsWeb) {
-        result = await FileService.splitTxtFileFromBytes(
-          selectedTxtFileBytes!,
-          selectedTxtFileName!,
-        );
-      } else {
-        result = await FileService.splitTxtFile(selectedTxtFile!);
-      }
-
-      if (!result['success']) {
-        _showErrorDialog(result['message']);
-        return;
-      }
-
-      // Download/Save files
-      if (kIsWeb) {
-        // Download both files for web
-        _downloadFileOnWeb(result['upContent'], result['upFileName']);
-
-        // Delay để tránh conflict download
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        _downloadFileOnWeb(result['downContent'], result['downFileName']);
-
-        _showSuccessDialog(
-          'Đã tách file thành công!\n${result['message']}',
-          'Files downloaded: ${result['upFileName']}, ${result['downFileName']}',
-        );
-      } else {
-        // Save files for desktop
-        String? selectedDir = await FilePicker.platform.getDirectoryPath(
-          dialogTitle: 'Chọn thư mục lưu file tách',
-        );
-
-        if (selectedDir != null) {
-          // Write UP file
-          File upFile = File('$selectedDir/${result['upFileName']}');
-          await upFile.writeAsString(result['upContent'], encoding: utf8);
-
-          // Write DOWN file
-          File downFile = File('$selectedDir/${result['downFileName']}');
-          await downFile.writeAsString(result['downContent'], encoding: utf8);
-
-          _showSuccessDialog(
-            'Đã tách file thành công!\n${result['message']}',
-            'Saved to: $selectedDir',
-          );
-        }
-      }
-    } catch (e) {
-      _showErrorDialog('Lỗi khi tách file: $e');
-    } finally {
-      setState(() {
-        isProcessing = false;
-      });
     }
   }
 
