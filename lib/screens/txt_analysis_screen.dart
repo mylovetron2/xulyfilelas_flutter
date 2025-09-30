@@ -261,7 +261,6 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
                 isZoomMode = !isZoomMode;
               });
             },
-            tooltip: isZoomMode ? 'Chuyển sang Pan' : 'Chuyển sang Zoom',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -278,7 +277,6 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
               });
               _loadChartData();
             },
-            tooltip: 'Reset Zoom',
           ),
         ],
       ),
@@ -603,7 +601,7 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
             sideTitles: SideTitles(showTitles: false),
           ),
           bottomTitles: AxisTitles(
-            axisNameWidget: const Text('Cột 2 (Giá trị)'),
+            axisNameWidget: const Text('Depth'),
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 30,
@@ -620,7 +618,7 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
             ),
           ),
           leftTitles: AxisTitles(
-            axisNameWidget: const Text('Cột 1 (TIME hoặc DEPTH)'),
+            axisNameWidget: const Text('TIME'),
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 50,
