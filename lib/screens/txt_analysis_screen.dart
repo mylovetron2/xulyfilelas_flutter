@@ -697,31 +697,7 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
             ? chartData.map((spot) => spot.y).reduce((a, b) => a < b ? a : b)
             : 0,
         lineTouchData: LineTouchData(
-          enabled: true,
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
-              return touchedBarSpots.map((barSpot) {
-                String trendType = '';
-                if (barSpot.barIndex == 0 && upTrendData.isNotEmpty) {
-                  trendType = ' (Tăng)';
-                } else if (barSpot.barIndex == 1 && downTrendData.isNotEmpty) {
-                  trendType = ' (Giảm)';
-                } else if (barSpot.barIndex == 2 &&
-                    stableTrendData.isNotEmpty) {
-                  trendType = ' (Ổn định)';
-                }
-
-                return LineTooltipItem(
-                  'X: ${barSpot.x.toStringAsFixed(2)}\nY: ${barSpot.y.toStringAsFixed(2)}$trendType',
-                  const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                );
-              }).toList();
-            },
-          ),
+          enabled: false, // Tắt hoàn toàn touch interaction và tooltip
         ),
       ),
     );
