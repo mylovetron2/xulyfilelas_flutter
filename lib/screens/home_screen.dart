@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/services.dart';
@@ -158,6 +159,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: const Text('Vẽ Biểu Đồ TXT'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Tách file TXT button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: selectedTxtFile != null && !isProcessing
+                          ? _splitTxtFile
+                          : null,
+                      icon: const Icon(Icons.call_split),
+                      label: const Text('Tách File TXT (UP/DOWN)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -494,6 +514,74 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _splitTxtFile() async {
+    if (selectedTxtFile == null) return;
+
+    setState(() {
+      isProcessing = true;
+    });
+
+    try {
+      Map<String, dynamic> result;
+
+      if (kIsWeb) {
+        result = await FileService.splitTxtFileFromBytes(
+          selectedTxtFileBytes!,
+          selectedTxtFileName!,
+        );
+      } else {
+        result = await FileService.splitTxtFile(selectedTxtFile!);
+      }
+
+      if (!result['success']) {
+        _showErrorDialog(result['message']);
+        return;
+      }
+
+      // Download/Save files
+      if (kIsWeb) {
+        // Download both files for web
+        _downloadFileOnWeb(result['upContent'], result['upFileName']);
+
+        // Delay để tránh conflict download
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        _downloadFileOnWeb(result['downContent'], result['downFileName']);
+
+        _showSuccessDialog(
+          'Đã tách file thành công!\n${result['message']}',
+          'Files downloaded: ${result['upFileName']}, ${result['downFileName']}',
+        );
+      } else {
+        // Save files for desktop
+        String? selectedDir = await FilePicker.platform.getDirectoryPath(
+          dialogTitle: 'Chọn thư mục lưu file tách',
+        );
+
+        if (selectedDir != null) {
+          // Write UP file
+          File upFile = File('$selectedDir/${result['upFileName']}');
+          await upFile.writeAsString(result['upContent'], encoding: utf8);
+
+          // Write DOWN file
+          File downFile = File('$selectedDir/${result['downFileName']}');
+          await downFile.writeAsString(result['downContent'], encoding: utf8);
+
+          _showSuccessDialog(
+            'Đã tách file thành công!\n${result['message']}',
+            'Saved to: $selectedDir',
+          );
+        }
+      }
+    } catch (e) {
+      _showErrorDialog('Lỗi khi tách file: $e');
+    } finally {
+      setState(() {
+        isProcessing = false;
+      });
+    }
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -538,22 +626,6 @@ class _HomeScreenState extends State<HomeScreen> {
               _openFile(filePath);
             },
             child: const Text('Mở File'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showInfoDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thông báo'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
           ),
         ],
       ),

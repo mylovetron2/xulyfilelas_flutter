@@ -686,4 +686,127 @@ class FileService {
       content.writeln(line);
     }
   }
+
+  // Tách file TXT dựa trên cột DIR (từ bytes cho web platform)
+  static Future<Map<String, dynamic>> splitTxtFileFromBytes(
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    try {
+      String content = utf8.decode(bytes);
+      List<String> lines = content.split('\n');
+      return _splitTxtLines(lines, fileName);
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi khi tách file TXT từ bytes: $e',
+        'upContent': '',
+        'downContent': '',
+      };
+    }
+  }
+
+  // Tách file TXT dựa trên cột DIR
+  static Future<Map<String, dynamic>> splitTxtFile(String txtPath) async {
+    try {
+      File txtFile = File(txtPath);
+      if (!await txtFile.exists()) {
+        throw Exception('Không mở được file TXT!');
+      }
+
+      List<String> lines = await txtFile.readAsLines(encoding: utf8);
+      String fileName = txtPath.split('/').last.split('\\').last;
+      return _splitTxtLines(lines, fileName);
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi khi tách file TXT: $e',
+        'upContent': '',
+        'downContent': '',
+      };
+    }
+  }
+
+  // Xử lý logic tách file dựa trên cột DIR
+  static Map<String, dynamic> _splitTxtLines(
+    List<String> lines,
+    String fileName,
+  ) {
+    // Tìm cột DIR trong header
+    int dirColIdx = -1;
+    int headerLineIdx = -1;
+
+    for (int i = 0; i < lines.length; i++) {
+      String line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      List<String> parts = line.split(RegExp(r'\s+'));
+      for (int j = 0; j < parts.length; j++) {
+        if (parts[j].toUpperCase() == 'DIR') {
+          dirColIdx = j;
+          headerLineIdx = i;
+          break;
+        }
+      }
+      if (dirColIdx != -1) break;
+    }
+
+    if (dirColIdx == -1 || headerLineIdx == -1) {
+      return {
+        'success': false,
+        'message': 'Không tìm thấy cột DIR trong file!',
+        'upContent': '',
+        'downContent': '',
+      };
+    }
+
+    // Tạo nội dung cho file UP và DOWN
+    List<String> upLines = [];
+    List<String> downLines = [];
+
+    // Giữ nguyên cấu trúc header cho cả 2 file
+    for (int i = 0; i <= headerLineIdx; i++) {
+      upLines.add(lines[i]);
+      downLines.add(lines[i]);
+    }
+
+    // Phân loại dữ liệu dựa trên cột DIR
+    int upCount = 0;
+    int downCount = 0;
+
+    for (int i = headerLineIdx + 1; i < lines.length; i++) {
+      String line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      List<String> parts = line.split(RegExp(r'\s+'));
+      if (parts.length <= dirColIdx) continue;
+
+      int dir = int.tryParse(parts[dirColIdx]) ?? -1;
+
+      if (dir == 0) {
+        downLines.add(lines[i]);
+        downCount++;
+      } else if (dir == 1) {
+        upLines.add(lines[i]);
+        upCount++;
+      }
+    }
+
+    // Tạo tên file mới
+    String baseName = fileName.replaceAll('.txt', '').replaceAll('.TXT', '');
+    String upFileName = '${baseName}_up.txt';
+    String downFileName = '${baseName}_down.txt';
+
+    return {
+      'success': true,
+      'message':
+          'Tách file thành công!\nUP: $upCount dòng\nDOWN: $downCount dòng',
+      'upContent': upLines.join('\n'),
+      'downContent': downLines.join('\n'),
+      'upFileName': upFileName,
+      'downFileName': downFileName,
+      'upCount': upCount,
+      'downCount': downCount,
+    };
+  }
 }
