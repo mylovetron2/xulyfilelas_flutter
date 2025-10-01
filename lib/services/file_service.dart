@@ -310,7 +310,7 @@ class FileService {
           double? depthVal = double.tryParse(trimmed);
           if (depthVal != null) {
             print('Found TIME block: $depthVal');
-            BlockData block = BlockData(depth: depthVal);
+            BlockData block = BlockData(index: depthVal, indexType: "DEPTH");
 
             // Đọc các dòng dữ liệu tiếp theo cho block này
             i++; // Move to next line for data

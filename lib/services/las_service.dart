@@ -93,6 +93,9 @@ class LasService {
       // Xử lý dữ liệu ASCII
       if (dataLines.isNotEmpty && curveInfoList.isNotEmpty) {
         blockList = _parseDataLines(dataLines, curveInfoList);
+
+        // 🔍 Debug first 10 blocks
+        debugBlockData(blockList, curveInfoList, maxItems: 10);
       }
 
       return {
@@ -217,6 +220,29 @@ class LasService {
     List<BlockData> blockList = [];
 
     try {
+      // Xác định loại index từ curve đầu tiên
+      String indexType = "DEPTH"; // Default
+      if (curveInfoList.isNotEmpty) {
+        String firstCurveName = curveInfoList[0].mnemonic.toUpperCase();
+        // Kiểm tra các tên thường gặp cho TIME
+        if (firstCurveName.contains("TIME") ||
+            firstCurveName.contains("TIM") ||
+            firstCurveName == "T" ||
+            firstCurveName == "TIME_INDEX" ||
+            firstCurveName.startsWith("TIM")) {
+          indexType = "TIME";
+        }
+        // Kiểm tra các tên thường gặp cho DEPTH
+        else if (firstCurveName.contains("DEPT") ||
+            firstCurveName.contains("DEPTH") ||
+            firstCurveName == "DEPT" ||
+            firstCurveName == "MD" ||
+            firstCurveName == "TVDSS" ||
+            firstCurveName == "TVD") {
+          indexType = "DEPTH";
+        }
+      }
+
       for (String line in dataLines) {
         line = line.trim();
         if (line.isEmpty) continue;
@@ -224,25 +250,151 @@ class LasService {
         // Tách các giá trị bằng space hoặc tab
         List<String> values = line.split(RegExp(r'\s+'));
 
-        if (values.length < 2) continue; // Cần ít nhất depth và 1 giá trị
+        if (values.length < 2) continue; // Cần ít nhất index và 1 giá trị
 
-        // Giá trị đầu tiên thường là depth
-        double depth = double.tryParse(values[0]) ?? 0.0;
+        // Giá trị đầu tiên là index (depth hoặc time)
+        double indexValue = double.tryParse(values[0]) ?? 0.0;
 
-        // Các giá trị còn lại là data
+        // Các giá trị còn lại là curve data (bỏ qua curve đầu tiên vì đó là index)
         List<List<double>> data = [];
-        for (int i = 1; i < values.length && i <= curveInfoList.length; i++) {
+        for (int i = 1; i < values.length && i < curveInfoList.length; i++) {
           double value = double.tryParse(values[i]) ?? 0.0;
           data.add([value]); // Mỗi curve là một list
         }
 
-        blockList.add(BlockData(depth: depth, data: data));
+        blockList.add(
+          BlockData(index: indexValue, indexType: indexType, data: data),
+        );
       }
     } catch (e) {
       print('Lỗi parse data lines: $e');
     }
 
     return blockList;
+  }
+
+  // Debug function - In ra thông tin chi tiết của blockList
+  static void debugBlockData(
+    List<BlockData> blockList,
+    List<CurveInfo> curveInfoList, {
+    int maxItems = 10,
+  }) {
+    print('\n🔍 ===== DEBUG BLOCK DATA =====');
+    print('📊 Total blocks: ${blockList.length}');
+
+    if (blockList.isEmpty) {
+      print('❌ No block data found!');
+      return;
+    }
+
+    // Thông tin chung
+    String indexType = blockList.first.indexType;
+    print('📋 Index Type: $indexType');
+    print('🎯 Index Range: ${blockList.first.index} → ${blockList.last.index}');
+    print('📈 Curves count: ${curveInfoList.length}');
+
+    // In curve info
+    print('\n📝 Curve Information:');
+    for (int i = 0; i < curveInfoList.length; i++) {
+      var curve = curveInfoList[i];
+      String indexIndicator = i == 0 ? ' (INDEX)' : '';
+      print(
+        '  [$i] ${curve.mnemonic}.${curve.unit} - ${curve.description}$indexIndicator',
+      );
+    }
+
+    // Debug từng block
+    int itemsToShow = blockList.length < maxItems ? blockList.length : maxItems;
+    print('\n📋 Block Data Details (showing first $itemsToShow):');
+
+    for (int i = 0; i < itemsToShow; i++) {
+      var block = blockList[i];
+      print('  Block $i:');
+      print('    ${block.indexType}: ${block.index}');
+      print('    Data curves: ${block.data.length}');
+
+      // In chi tiết từng curve value (skip curve đầu tiên vì đó là index)
+      for (int j = 0; j < block.data.length; j++) {
+        // j trong block.data tương ứng với curve thứ (j+1) trong curveInfoList
+        int curveIndex = j + 1; // Skip curve đầu tiên (index curve)
+        String curveName = curveIndex < curveInfoList.length
+            ? curveInfoList[curveIndex].mnemonic
+            : 'Unknown';
+        String value = block.data[j].isNotEmpty
+            ? block.data[j][0].toString()
+            : 'No data';
+        print('      [$j] $curveName: $value');
+      }
+      print('');
+    }
+
+    // Statistics
+    if (blockList.length > 1) {
+      double indexStep = blockList[1].index - blockList[0].index;
+      print('📏 Index step: $indexStep');
+    }
+
+    print('🔍 ===== END DEBUG =====\n');
+  }
+
+  // Debug từ console - trả về Map với debug info
+  static Map<String, dynamic> getDebugInfo(
+    List<BlockData> blockList,
+    List<CurveInfo> curveInfoList,
+  ) {
+    if (blockList.isEmpty) {
+      return {'error': 'No block data available'};
+    }
+
+    Map<String, dynamic> debugInfo = {
+      'totalBlocks': blockList.length,
+      'indexType': blockList.first.indexType,
+      'indexRange': {
+        'first': blockList.first.index,
+        'last': blockList.last.index,
+        'step': blockList.length > 1
+            ? blockList[1].index - blockList[0].index
+            : 0.0,
+      },
+      'curvesCount': curveInfoList.length,
+      'curves': curveInfoList
+          .map(
+            (c) => {
+              'mnemonic': c.mnemonic,
+              'unit': c.unit,
+              'description': c.description,
+            },
+          )
+          .toList(),
+      'firstTenBlocks': [],
+    };
+
+    // Thêm thông tin 10 blocks đầu
+    int maxBlocks = blockList.length < 10 ? blockList.length : 10;
+    for (int i = 0; i < maxBlocks; i++) {
+      var block = blockList[i];
+      Map<String, dynamic> blockInfo = {
+        'blockIndex': i,
+        'indexValue': block.index,
+        'indexType': block.indexType,
+        'dataLength': block.data.length,
+        'curveValues': {},
+      };
+
+      // Thêm values của từng curve (skip curve đầu tiên vì đó là index)
+      for (int j = 0; j < block.data.length; j++) {
+        int curveIndex = j + 1; // Skip curve đầu tiên (index curve)
+        if (curveIndex < curveInfoList.length) {
+          String curveName = curveInfoList[curveIndex].mnemonic;
+          double value = block.data[j].isNotEmpty ? block.data[j][0] : 0.0;
+          blockInfo['curveValues'][curveName] = value;
+        }
+      }
+
+      debugInfo['firstTenBlocks'].add(blockInfo);
+    }
+
+    return debugInfo;
   }
 
   // Validate file LAS

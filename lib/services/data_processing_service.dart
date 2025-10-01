@@ -202,7 +202,11 @@ class DataProcessingService {
         avgRows.add(avgCol);
       }
 
-      BlockData newBlock = BlockData(depth: entry.key, data: avgRows);
+      BlockData newBlock = BlockData(
+        index: entry.key,
+        indexType: "DEPTH",
+        data: avgRows,
+      );
       result.add(newBlock);
     }
 
@@ -284,7 +288,8 @@ class DataProcessingService {
           }
 
           BlockData interpBlock = BlockData(
-            depth: interpDepth,
+            index: interpDepth,
+            indexType: "DEPTH",
             data: interpData,
           );
           interpolated.add(interpBlock);

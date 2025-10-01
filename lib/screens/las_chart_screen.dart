@@ -42,17 +42,21 @@ class _LasChartScreenState extends State<LasChartScreen> {
   }
 
   void _initializeCurveSettings() {
-    // Khởi tạo settings cho từng curve
-    for (int i = 0; i < widget.curveInfoList.length; i++) {
-      curveVisibility[i] = i < 5; // Hiển thị 5 curve đầu tiên
+    // Khởi tạo settings cho từng curve (bỏ qua curve đầu tiên vì đó là index)
+    for (int i = 1; i < widget.curveInfoList.length; i++) {
+      // Start from 1
+      curveVisibility[i] = i <= 5; // Hiển thị 5 curve đầu tiên
       curveColors[i] = _getDefaultColor(i);
       curveWidths[i] = 2.0;
 
       // Tính min/max values cho curve
       List<double> values = [];
+      int dataIndex = i - 1; // Map từ curveInfoList index sang block.data index
       for (var block in widget.blockList) {
-        if (block.data.length > i && block.data[i].isNotEmpty) {
-          values.add(block.data[i][0]);
+        if (dataIndex >= 0 &&
+            dataIndex < block.data.length &&
+            block.data[dataIndex].isNotEmpty) {
+          values.add(block.data[dataIndex][0]);
         }
       }
 
@@ -113,6 +117,8 @@ class _LasChartScreenState extends State<LasChartScreen> {
                     children: [
                       Text('Số điểm dữ liệu: ${widget.blockList.length}'),
                       const SizedBox(width: 16),
+                      Text('${_getIndexTypeLabel()}: ${_getIndexRange()}'),
+                      const SizedBox(width: 16),
                       Text(
                         'Curves hiển thị: ${curveVisibility.values.where((v) => v).length}',
                       ),
@@ -145,9 +151,11 @@ class _LasChartScreenState extends State<LasChartScreen> {
                                 );
                               },
                             ),
-                            axisNameWidget: const Text(
-                              'Depth',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            axisNameWidget: Text(
+                              _getIndexTypeLabel(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           bottomTitles: AxisTitles(
@@ -187,9 +195,12 @@ class _LasChartScreenState extends State<LasChartScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: widget.curveInfoList.length,
+                    itemCount:
+                        widget.curveInfoList.length - 1, // Skip index curve
                     itemBuilder: (context, index) {
-                      if (!curveVisibility[index]!)
+                      int curveIndex =
+                          index + 1; // Skip index curve (start from 1)
+                      if (curveVisibility[curveIndex] != true)
                         return const SizedBox.shrink();
 
                       return Container(
@@ -208,11 +219,11 @@ class _LasChartScreenState extends State<LasChartScreen> {
                                 Container(
                                   width: 20,
                                   height: 3,
-                                  color: curveColors[index],
+                                  color: curveColors[curveIndex],
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  widget.curveInfoList[index].mnemonic,
+                                  widget.curveInfoList[curveIndex].mnemonic,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -220,11 +231,11 @@ class _LasChartScreenState extends State<LasChartScreen> {
                               ],
                             ),
                             Text(
-                              widget.curveInfoList[index].unit,
+                              widget.curveInfoList[curveIndex].unit,
                               style: const TextStyle(fontSize: 10),
                             ),
                             Text(
-                              widget.curveInfoList[index].description,
+                              widget.curveInfoList[curveIndex].description,
                               style: const TextStyle(fontSize: 8),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -244,13 +255,15 @@ class _LasChartScreenState extends State<LasChartScreen> {
     List<LineChartBarData> lineBars = [];
 
     for (
-      int curveIndex = 0;
+      int curveIndex = 1; // Start from 1 to skip index curve
       curveIndex < widget.curveInfoList.length;
       curveIndex++
     ) {
-      if (!curveVisibility[curveIndex]!) continue;
+      if (curveVisibility[curveIndex] != true) continue;
 
       List<FlSpot> spots = [];
+      int dataIndex =
+          curveIndex - 1; // Map từ curveInfoList index sang block.data index
 
       for (
         int blockIndex = 0;
@@ -258,9 +271,10 @@ class _LasChartScreenState extends State<LasChartScreen> {
         blockIndex++
       ) {
         var block = widget.blockList[blockIndex];
-        if (block.data.length > curveIndex &&
-            block.data[curveIndex].isNotEmpty) {
-          double value = block.data[curveIndex][0];
+        if (dataIndex >= 0 &&
+            dataIndex < block.data.length &&
+            block.data[dataIndex].isNotEmpty) {
+          double value = block.data[dataIndex][0];
 
           // Normalize value theo min/max của curve
           double normalizedValue = _normalizeValue(
@@ -270,7 +284,7 @@ class _LasChartScreenState extends State<LasChartScreen> {
             curveIndex,
           );
 
-          spots.add(FlSpot(normalizedValue, block.depth));
+          spots.add(FlSpot(normalizedValue, block.index));
         }
       }
 
@@ -331,5 +345,18 @@ class _LasChartScreenState extends State<LasChartScreen> {
       showGrid = true;
       showTooltip = false;
     });
+  }
+
+  String _getIndexTypeLabel() {
+    if (widget.blockList.isEmpty) return 'Index';
+    return widget.blockList.first.indexType == 'TIME' ? 'Time' : 'Depth';
+  }
+
+  String _getIndexRange() {
+    if (widget.blockList.isEmpty) return '';
+    double min = widget.blockList.first.index;
+    double max = widget.blockList.last.index;
+    String unit = widget.blockList.first.indexType == 'TIME' ? 's' : 'm';
+    return '${min.toStringAsFixed(2)} - ${max.toStringAsFixed(2)} $unit';
   }
 }

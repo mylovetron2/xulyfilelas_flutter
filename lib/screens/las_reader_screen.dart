@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import 'las_chart_screen.dart';
+import 'las_data_table_screen.dart';
 
 class LasReaderScreen extends StatefulWidget {
   const LasReaderScreen({super.key});
@@ -176,11 +177,33 @@ class _LasReaderScreenState extends State<LasReaderScreen> {
                               const SizedBox(height: 8),
                               Text('Số lượng blocks: ${blockList.length}'),
                               if (blockList.isNotEmpty) ...[
-                                Text('Depth từ: ${blockList.first.depth}'),
-                                Text('Depth đến: ${blockList.last.depth}'),
+                                Text(
+                                  '${_getIndexTypeLabel()}: ${blockList.first.index} - ${blockList.last.index}',
+                                ),
                                 Text(
                                   'Số cột dữ liệu: ${blockList.first.data.isNotEmpty ? blockList.first.data.length : 0}',
                                 ),
+                                const SizedBox(height: 8),
+                                // Debug info cho 3 blocks đầu tiên
+                                Text(
+                                  'Debug - 3 blocks đầu:',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                ...blockList
+                                    .take(3)
+                                    .map(
+                                      (block) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: 8.0,
+                                        ),
+                                        child: Text(
+                                          '${block.indexType}: ${block.index} (${block.data.length} curves)',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
                               ],
                             ],
                           ),
@@ -198,6 +221,38 @@ class _LasReaderScreenState extends State<LasReaderScreen> {
                           label: const Text('Vẽ Đồ Thị'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Data table button
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openDataTableScreen(),
+                          icon: const Icon(Icons.table_view),
+                          label: const Text('Xem Bảng Dữ Liệu'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Debug button
+                      SizedBox(
+                        height: 40,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showDebugDialog(),
+                          icon: const Icon(Icons.bug_report, size: 16),
+                          label: const Text('Debug Info'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -352,6 +407,22 @@ class _LasReaderScreenState extends State<LasReaderScreen> {
     );
   }
 
+  void _openDataTableScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LasDataTableScreen(
+          blockList: blockList,
+          curveInfoList: curveInfoList,
+          fileName:
+              selectedLasFileName ??
+              selectedLasFile?.split('/').last ??
+              'Unknown File',
+        ),
+      ),
+    );
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -366,6 +437,100 @@ class _LasReaderScreenState extends State<LasReaderScreen> {
         ],
       ),
     );
+  }
+
+  String _getIndexTypeLabel() {
+    if (blockList.isEmpty) return 'Index';
+    return blockList.first.indexType == 'TIME' ? 'Time' : 'Depth';
+  }
+
+  void _showDebugDialog() {
+    if (blockList.isEmpty) {
+      _showErrorDialog('Không có dữ liệu để debug');
+      return;
+    }
+
+    String debugInfo = _generateDebugInfo();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Debug Information'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              debugInfo,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _generateDebugInfo() {
+    StringBuffer buffer = StringBuffer();
+
+    buffer.writeln('🔍 DEBUG INFORMATION');
+    buffer.writeln('===================');
+    buffer.writeln('📊 Total blocks: ${blockList.length}');
+    buffer.writeln('📋 Index Type: ${blockList.first.indexType}');
+    buffer.writeln(
+      '🎯 Index Range: ${blockList.first.index} → ${blockList.last.index}',
+    );
+    buffer.writeln('📈 Curves count: ${curveInfoList.length}');
+    buffer.writeln('');
+
+    // Curve info
+    buffer.writeln('📝 CURVE INFORMATION:');
+    for (int i = 0; i < curveInfoList.length; i++) {
+      var curve = curveInfoList[i];
+      String indexIndicator = i == 0 ? ' (INDEX)' : '';
+      buffer.writeln(
+        '  [$i] ${curve.mnemonic}.${curve.unit} - ${curve.description}$indexIndicator',
+      );
+    }
+    buffer.writeln('');
+
+    // First 10 blocks
+    int maxBlocks = blockList.length < 10 ? blockList.length : 10;
+    buffer.writeln('📋 FIRST $maxBlocks BLOCKS:');
+
+    for (int i = 0; i < maxBlocks; i++) {
+      var block = blockList[i];
+      buffer.writeln('  Block $i:');
+      buffer.writeln('    ${block.indexType}: ${block.index}');
+      buffer.writeln('    Data curves: ${block.data.length}');
+
+      for (int j = 0; j < block.data.length; j++) {
+        // j trong block.data tương ứng với curve thứ (j+1) trong curveInfoList
+        int curveIndex = j + 1; // Skip curve đầu tiên (index curve)
+        String curveName = curveIndex < curveInfoList.length
+            ? curveInfoList[curveIndex].mnemonic
+            : 'Unknown';
+        String value = block.data[j].isNotEmpty
+            ? block.data[j][0].toStringAsFixed(3)
+            : 'No data';
+        buffer.writeln('      [$j] $curveName: $value');
+      }
+      buffer.writeln('');
+    }
+
+    // Statistics
+    if (blockList.length > 1) {
+      double indexStep = blockList[1].index - blockList[0].index;
+      buffer.writeln('📏 Index step: $indexStep');
+    }
+
+    return buffer.toString();
   }
 
   void _showSuccessDialog(String message) {
